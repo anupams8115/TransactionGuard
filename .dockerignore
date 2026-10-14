@@ -1,0 +1,16 @@
+.venv
+**/__pycache__
+**/node_modules
+frontend/.next
+data/raw
+data/processed
+data/synthetic
+data/uploads
+artifacts
+reports
+mlflow.db
+*.db
+.env
+.git
+.pytest_cache
+.ruff_cache

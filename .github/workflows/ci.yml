@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TG_JWT_SECRET: ci-only-secret-not-used-anywhere-else-0123456789
+  TG_ENVIRONMENT: test
+
+jobs:
+  backend:
+    name: Backend lint + tests (real PostgreSQL & Redis)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tg
+          POSTGRES_PASSWORD: tg-ci-password
+          POSTGRES_DB: tg_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tg -d tg_test" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7.4
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.19"
+      - run: uv sync --frozen
+      - name: Lint
+        run: |
+          uv run ruff check src tests migrations
+          uv run ruff format --check src tests migrations
+      - name: Tests (unit + mocked integration + real services)
+        env:
+          TG_TEST_DATABASE_URL: postgresql+psycopg://tg:tg-ci-password@localhost:5432/tg_test
+          TG_TEST_REDIS_URL: redis://localhost:6379/0
+        run: uv run pytest -q --cov=transactionguard --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+
+  frontend:
+    name: Frontend lint + typecheck + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (browser -> Next.js -> FastAPI -> DB -> model)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    env:
+      E2E_PASSWORD: ci-e2e-password-1234
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.19"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Prepare data, train a smoke model, seed demo users
+        run: |
+          uv sync --frozen
+          uv run tg data prepare synthetic --accounts 400 --days 30
+          uv run tg train synthetic --budget smoke --no-mlflow
+          uv run tg db upgrade
+          uv run tg demo seed --n 800 --password "$E2E_PASSWORD"
+      - name: Build dashboard and install browser
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npx playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: frontend
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder env for compose interpolation
+        run: printf 'POSTGRES_PASSWORD=ci\nTG_JWT_SECRET=ci\n' > .env
+      - run: docker compose build api frontend

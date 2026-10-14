@@ -1,0 +1,90 @@
+# TransactionGuard local stack: PostgreSQL + Redis + API + Celery worker + dashboard.
+#
+#   cp .env.example .env            # then set TG_JWT_SECRET and POSTGRES_PASSWORD
+#   docker compose up --build -d
+#   docker compose run --rm api tg data prepare synthetic
+#   docker compose run --rm api tg train synthetic --budget small
+#   docker compose run --rm api tg demo seed --password "<choose-one>"
+#   open http://localhost:3000
+#
+# Optional profiles:  --profile mlflow  (MLflow UI on :5000)   --profile kafka  (streaming ingestion)
+name: transactionguard
+
+x-backend: &backend
+  build: { context: ., dockerfile: docker/backend.Dockerfile }
+  env_file: .env
+  environment:
+    TG_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transactionguard}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-transactionguard}
+    TG_REDIS_URL: redis://redis:6379/0
+    TG_CELERY_EAGER: "false"
+    TG_MLFLOW_TRACKING_URI: sqlite:////app/artifacts/mlflow.db
+    TG_DATA_DIR: /app/data
+    TG_ARTIFACTS_DIR: /app/artifacts
+    TG_REPORTS_DIR: /app/reports
+  volumes:
+    - tg-data:/app/data
+    - tg-artifacts:/app/artifacts
+    - tg-reports:/app/reports
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-transactionguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-transactionguard}
+    volumes: [pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    command: ["tg", "db", "upgrade"]
+    restart: "no"
+
+  api:
+    <<: *backend
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "transactionguard.worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  frontend:
+    build: { context: ., dockerfile: docker/frontend.Dockerfile, args: { API_URL: "http://api:8000" } }
+    ports: ["3000:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+
+  mlflow:
+    profiles: ["mlflow"]
+    <<: *backend
+    command: ["mlflow", "ui", "--backend-store-uri", "sqlite:////app/artifacts/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+    ports: ["5000:5000"]
+
+volumes:
+  pg-data:
+  tg-data:
+  tg-artifacts:
+  tg-reports:
