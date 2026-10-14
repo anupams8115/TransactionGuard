@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/* Analyst console: quiet slate neutrals, a teal accent for navigation/actions, amber reserved for
+   risk (flags, alerts). Semantic colours (ok / danger) are separate from the accent. */
+:root {
+  --ground: #f4f6f7;
+  --panel: #ffffff;
+  --panel-2: #eef2f3;
+  --ink: #17232a;
+  --muted: #5b6b73;
+  --line: #d8e0e3;
+  --accent: #1c6a86;
+  --accent-ink: #ffffff;
+  --risk: #b4600c;
+  --risk-soft: #fbefe1;
+  --ok: #2e7a4d;
+  --ok-soft: #e4f3ea;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --synthetic: #6b4fa0;
+  --synthetic-soft: #efe9f8;
+  --increase: #c2410c;
+  --decrease: #1d6fa5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #0f171b;
+    --panel: #162127;
+    --panel-2: #1c2a31;
+    --ink: #e2eaed;
+    --muted: #96a8b0;
+    --line: #2a3a42;
+    --accent: #5db2d0;
+    --accent-ink: #0b1a20;
+    --risk: #e7a352;
+    --risk-soft: #3a2a17;
+    --ok: #6cc28f;
+    --ok-soft: #173126;
+    --danger: #f08a80;
+    --danger-soft: #3b1d1a;
+    --synthetic: #b8a2e3;
+    --synthetic-soft: #2a2238;
+    --increase: #f0904f;
+    --decrease: #6fb3e0;
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-risk: var(--risk);
+  --color-risk-soft: var(--risk-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-synthetic: var(--synthetic);
+  --color-synthetic-soft: var(--synthetic-soft);
+  --color-increase: var(--increase);
+  --color-decrease: var(--decrease);
+  --font-sans: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-plex-condensed), "Arial Narrow", system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
