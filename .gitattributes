@@ -1,0 +1,5 @@
+# Normalise line endings in the repo; Linux CI and Docker need LF in scripts and configs.
+* text=auto eol=lf
+*.png binary
+*.gz binary
+*.parquet binary
