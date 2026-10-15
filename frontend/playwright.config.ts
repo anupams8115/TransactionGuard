@@ -7,7 +7,8 @@ import { defineConfig, devices } from "@playwright/test";
 //   tg data prepare synthetic && tg train synthetic --budget smoke && tg db upgrade
 //   tg demo seed --n 500 --password "$E2E_PASSWORD"
 // Existing servers on :8000 / :3000 are reused; otherwise Playwright starts them.
-const python = path.join("..", ".venv", process.platform === "win32" ? "Scripts" : "bin", "uvicorn");
+// The API command runs with cwd = repo root, so the venv path is relative to the root.
+const python = path.join(".venv", process.platform === "win32" ? "Scripts" : "bin", "uvicorn");
 
 export default defineConfig({
   testDir: "./e2e",
