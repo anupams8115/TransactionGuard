@@ -9,8 +9,10 @@ Last local run (2026-10-14, Windows 11):
 | `ruff check` / `ruff format --check` | clean | |
 | `npm run lint` / `npm run typecheck` / `npm run build` | clean | |
 
-In CI (`.github/workflows/ci.yml`) the two skipped tests run against PostgreSQL 17 and Redis 7.4
-service containers. **CI has not run yet**, because the repository has not been pushed.
+In CI (`.github/workflows/ci.yml`, GitHub Actions, run 38669295613 on 2026-10-15) all four jobs
+pass: **98 passed, 0 skipped**, including the PostgreSQL 17 migration round-trip and a real Celery
+worker consuming from a Redis 7.4 broker; line coverage is 85%. The Playwright end-to-end test
+and the Docker image builds also pass.
 
 ## What runs against what
 
@@ -46,5 +48,6 @@ service containers. **CI has not run yet**, because the repository has not been 
 - No property-based or fuzz testing of the CSV parser.
 - The frontend has no component-level unit tests; only the end-to-end flow is tested.
 - No test of token revocation (tokens are valid until expiry; there is no deny-list).
-- Docker images are built in CI but the composed stack is not exercised end-to-end there.
+- Docker images are built in CI, but the composed stack (PostgreSQL + Redis + API + worker) is not
+  exercised end-to-end there.
 - No rate limiting, so it is not tested either.
